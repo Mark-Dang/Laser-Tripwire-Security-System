@@ -1,18 +1,19 @@
 #include <Arduino.h>
 
 // put function declarations here:
-int myFunction(int, int);
 
 void setup() {
   // put your setup code here, to run once:
-  int result = myFunction(2, 3);
+  pinMode(25, OUTPUT); //GPIO output for laser diode
+  pinMode(33, INPUT); //Push button input to activate alarm
+  digitalWrite(25, HIGH);
 }
 
 void loop() {
-  // put your main code here, to run repeatedly:
+  if (digitalRead(33) == HIGH) {
+    digitalWrite(25, !digitalRead(25));
+    delay(250);
+  }
 }
 
 // put function definitions here:
-int myFunction(int x, int y) {
-  return x + y;
-}
