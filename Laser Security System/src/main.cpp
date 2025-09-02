@@ -1,19 +1,22 @@
 #include <Arduino.h>
 
 typedef enum {OFF = 0, ON = 1} systemState; // state of 
-typedef enum {laserDiode = 25, pushButton = 33, photoResistor = 36, LED = 22, buzzer = 37} ioPins;
+typedef enum {laserDiode = 25, pushButton = 33, photoResistor = 36, LED = 17, buzzer = 2} ioPins;
 
 // put function declarations here:
 void toggleState(); // Turns on trip wire security 
 void runState(); //Run the functions of said state
 void armSystem();
 void calibrateLDR(); // Calibrate photoresistor to detect when the laser diode's beam is broken
+void activateAlarm();
+void deactivateAlarm();
 
 
 systemState sysState;
 unsigned int maxLight;
 unsigned int minLight;
 
+//NOTE: everything works; however it takes 3 button presses to get out of activateAlarm state
 void setup() {
   // set pin modes
   Serial.begin(9600);
@@ -53,21 +56,24 @@ void toggleState() {
 void runState() {
   switch(sysState) {
     case(OFF):
-      digitalWrite(laserDiode, LOW);
-      digitalWrite(LED, LOW);
+      deactivateAlarm();
       break;
     case(ON):
       digitalWrite(laserDiode, HIGH);
       calibrateLDR();
+      delay(100);
+      Serial.println("Activated");
       while(1) {
         unsigned int readVal = analogRead(photoResistor);
-        if (readVal < (maxLight + minLight) / 2) {
-          Serial.println(readVal);
+        Serial.println(readVal); //for testing
+        if (readVal < maxLight - 500) { //could use some major work
+          Serial.println(readVal); //for testing
           Serial.println("tripwire triggered");
+          activateAlarm();
           break;
         }
-        break;
       }
+      break;
       //check for a trigger
       //run actions for a trigger
       //exit
@@ -76,21 +82,47 @@ void runState() {
 }
 
 
+void activateAlarm() {
+  unsigned long toggleTime = millis();
+  bool buzzerOn = false;
+  while (!digitalRead(33) == HIGH) {
+    unsigned long currentTime = millis();
+    if (currentTime >= toggleTime) {
+      toggleTime = currentTime + 500;
+      digitalWrite(LED, !digitalRead(LED));
+      if (buzzerOn == true) { //can change to make it play two different tones
+        buzzerOn = false;
+        noTone(buzzer);
+      } else {
+        buzzerOn = true;
+        tone(buzzer, 440);
+      }
+    }
+  }
+  deactivateAlarm();
+}
+
+
+void deactivateAlarm() {
+  digitalWrite(laserDiode, LOW);
+  noTone(buzzer);
+  digitalWrite(LED, LOW);
+}
+
+
 void calibrateLDR() {
   unsigned int count = 0;
-  unsigned long fiveSecondTimer = millis() + 5000;
+  unsigned long threeSecondTimer = millis() + 3000;
 
   maxLight = 0;
   minLight = INT_MAX;
 
-  digitalWrite(LED, HIGH);
-  while (millis() < fiveSecondTimer) {
+  delay(200);
+  while (millis() < threeSecondTimer) {
     unsigned int readVal = analogRead(photoResistor);
+    Serial.println(readVal); //for testing
     if (readVal > maxLight) maxLight = readVal;
     else if (readVal < minLight) minLight = readVal;
   }
-  digitalWrite(LED, LOW);
-  Serial.println(maxLight); //testing
-  Serial.println(minLight);
 }
 
